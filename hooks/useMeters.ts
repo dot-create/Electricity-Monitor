@@ -30,6 +30,7 @@ export const useMeters = () => {
     name: string,
     location: string,
     meterId?: string,
+    startingReading: number = 0,
     dailyLimit: number = 0,
     monthlyLimit: number = 0
   ): Promise<void> => {
@@ -43,6 +44,7 @@ export const useMeters = () => {
         name: name.trim(),
         location: location.trim(),
         meterId: meterId?.trim(),
+        startingReading: startingReading > 0 ? startingReading : undefined,
         createdDate: new Date().toISOString(),
         limits: {
           daily: dailyLimit,
@@ -69,6 +71,7 @@ export const useMeters = () => {
       if (updates.name) FormValidator.validateMeterName(updates.name);
       if (updates.location) FormValidator.validateLocation(updates.location);
       if (updates.meterId !== undefined) FormValidator.validateMeterId(updates.meterId);
+      if (updates.startingReading !== undefined) FormValidator.validateStartingReading(updates.startingReading);
 
       const updatedMeters = meters.map(meter => 
         meter.id === id ? { ...meter, ...updates } : meter
