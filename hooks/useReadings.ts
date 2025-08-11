@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { StorageManager } from '@/utils/storage';
 import { FormValidator } from '@/utils/validation';
 import { Reading } from '@/types';
+import { useMeters } from './useMeters';
 
 export const useReadings = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
@@ -9,6 +10,7 @@ export const useReadings = () => {
   const [error, setError] = useState<string | null>(null);
 
   const loadReadings = useCallback(async () => {
+    const { getMeter } = useMeters();
     try {
       setLoading(true);
       setError(null);
@@ -33,7 +35,10 @@ export const useReadings = () => {
   ): Promise<void> => {
     try {
       FormValidator.validateDate(date);
-      const validatedUnits = FormValidator.validateUnits(units);
+      
+      const meter = getMeter(meterId);
+      const calculatedUnits = meter?.startingReading ? units - meter.startingReading : units;
+      const validatedUnits = FormValidator.validateUnits(calculatedUnits);
 
       // Check for duplicate entries
       const existingReading = readings.find(
