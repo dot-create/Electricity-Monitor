@@ -3,6 +3,7 @@ export interface Meter {
   name: string;
   location: string;
   meterId?: string;
+  startingReading?: number;
   createdDate: string;
   limits: {
     daily: number;
