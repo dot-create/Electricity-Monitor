@@ -11,19 +11,19 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginTop: 4,
-        },
+        // tabBarStyle: {
+        //   backgroundColor: colors.card,
+        //   borderTopColor: colors.border,
+        //   borderTopWidth: 1,
+        //   paddingTop: 8,
+        //   paddingBottom: 8,
+        //   height: 60,
+        // },
+        // tabBarLabelStyle: {
+        //   fontSize: 12,
+        //   fontWeight: '500',
+        //   marginTop: 4,
+        // },
       }}
     >
       <Tabs.Screen

@@ -14,7 +14,8 @@ export interface Reading {
   id: string;
   meterId: string;
   date: string;
-  units: number;
+  reading: number; // Cumulative meter reading
+  consumption?: number; // Calculated daily consumption
   timestamp: string;
 }
 

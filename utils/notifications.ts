@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { UsageCalculator } from './calculations';
-import { Meter, Reading } from '@/types';
+import { Meter, Reading, NotificationSettings } from '@/types';
 
 export class NotificationManager {
   static async requestPermissions(): Promise<boolean> {
@@ -64,6 +64,30 @@ export class NotificationManager {
     }
   }
 
+  static async scheduleWeeklyReport(): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
+        return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Weekly Usage Report',
+          body: 'Check your weekly electricity usage summary in the app',
+          sound: 'default',
+        },
+        trigger: {
+          weekday: 1, // Monday
+          hour: 9,
+          minute: 0,
+          repeats: true,
+        },
+      });
+    } catch (error) {
+      console.error('Error scheduling weekly report:', error);
+    }
+  }
+
   static async showLimitAlert(
     meterName: string,
     usage: number,
@@ -97,10 +121,43 @@ export class NotificationManager {
     }
   }
 
+  static async showTrendAlert(
+    meterName: string,
+    trend: 'increasing' | 'decreasing',
+    percentage: number
+  ): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
+        return;
+      }
+
+      const message = trend === 'increasing' 
+        ? `${meterName}: Usage increased by ${percentage.toFixed(1)}% this week`
+        : `${meterName}: Usage decreased by ${Math.abs(percentage).toFixed(1)}% this week`;
+      
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `Usage Trend Alert`,
+          body: message,
+          sound: 'default',
+          data: {
+            type: 'trend_alert',
+            meterName,
+            trend,
+            percentage,
+          },
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      console.error('Error showing trend alert:', error);
+    }
+  }
+
   static async checkAndNotifyLimits(
     meters: Meter[],
     readings: Reading[],
-    notificationSettings: any
+    notificationSettings: NotificationSettings
   ): Promise<void> {
     if (!notificationSettings.enabled || Platform.OS === 'web') {
       return;
@@ -108,11 +165,11 @@ export class NotificationManager {
 
     for (const meter of meters) {
       const stats = UsageCalculator.getUsageStats(readings, meter.id);
+      const todayConsumption = UsageCalculator.getTodayConsumption(readings, meter.id);
 
       if (notificationSettings.dailyLimit && meter.limits.daily > 0) {
-        const todayUsage = this.getTodayUsage(readings, meter.id);
-        if (todayUsage > meter.limits.daily) {
-          await this.showLimitAlert(meter.name, todayUsage, meter.limits.daily, 'daily');
+        if (todayConsumption > meter.limits.daily) {
+          await this.showLimitAlert(meter.name, todayConsumption, meter.limits.daily, 'daily');
         }
       }
 
@@ -129,9 +186,47 @@ export class NotificationManager {
     }
   }
 
-  private static getTodayUsage(readings: Reading[], meterId: string): number {
-    const today = new Date().toISOString().split('T')[0];
-    const todayReading = readings.find(r => r.meterId === meterId && r.date === today);
-    return todayReading ? todayReading.units : 0;
+  static async checkAndNotifyTrends(
+    meters: Meter[],
+    readings: Reading[]
+  ): Promise<void> {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    for (const meter of meters) {
+      const trend = UsageCalculator.getConsumptionTrend(readings, meter.id, 7);
+      
+      if (trend === 'increasing') {
+        const currentWeek = UsageCalculator.getWeeklyTotal(readings, meter.id);
+        const lastWeek = this.getLastWeekTotal(readings, meter.id);
+        
+        if (lastWeek > 0) {
+          const percentage = ((currentWeek - lastWeek) / lastWeek) * 100;
+          if (percentage > 20) { // Only notify for significant increases
+            await this.showTrendAlert(meter.name, 'increasing', percentage);
+          }
+        }
+      }
+    }
+  }
+
+  private static getLastWeekTotal(readings: Reading[], meterId: string): number {
+    const now = new Date();
+    const startOfLastWeek = new Date(now.setDate(now.getDate() - now.getDay() - 6));
+    const endOfLastWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    startOfLastWeek.setHours(0, 0, 0, 0);
+    endOfLastWeek.setHours(23, 59, 59, 999);
+
+    const readingsWithConsumption = UsageCalculator.calculateConsumption(readings);
+    
+    return readingsWithConsumption
+      .filter(reading => {
+        const readingDate = new Date(reading.date);
+        return reading.meterId === meterId && 
+               readingDate >= startOfLastWeek && 
+               readingDate <= endOfLastWeek;
+      })
+      .reduce((total, reading) => total + (reading.consumption || 0), 0);
   }
 }

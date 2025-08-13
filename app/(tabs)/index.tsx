@@ -26,43 +26,101 @@ export default function DashboardScreen() {
   const { readings, loading: readingsLoading, refreshReadings } = useReadings();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastNotificationCheck, setLastNotificationCheck] = useState<Date | null>(null);
 
   const loading = metersLoading || readingsLoading;
 
   useEffect(() => {
-    checkForLimitExceeded();
+    checkForNotifications();
   }, [meters, readings]);
 
-  const checkForLimitExceeded = async () => {
+  useEffect(() => {
+    // Check for notifications every 5 minutes
+    const interval = setInterval(() => {
+      checkForNotifications();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [meters, readings]);
+
+  const checkForNotifications = async () => {
     const settings = await StorageManager.getSettings();
     const alerts: any[] = [];
+    
+    // Check each meter individually
+    for (const meter of meters) {
+      const meterReadings = readings.filter(r => r.meterId === meter.id);
+      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+      const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
+      const yesterdayConsumption = UsageCalculator.getYesterdayConsumption(meterReadings, meter.id);
+      const trend = UsageCalculator.getConsumptionTrend(meterReadings, meter.id);
+      const peakDay = UsageCalculator.getPeakUsageDay(meterReadings, meter.id);
 
-    meters.forEach(meter => {
-      const stats = UsageCalculator.getUsageStats(readings, meter.id);
-      const todayReading = readings.find(
-        r => r.meterId === meter.id && r.date === new Date().toISOString().split('T')[0]
-      );
-
-      if (meter.limits.daily > 0 && todayReading && todayReading.units > meter.limits.daily) {
+      // Daily limit alerts
+      if (settings.notifications.dailyLimit && meter.limits.daily > 0 && todayConsumption > meter.limits.daily) {
+        const percentage = ((todayConsumption - meter.limits.daily) / meter.limits.daily * 100).toFixed(1);
         alerts.push({
           id: `daily-${meter.id}`,
           title: 'Daily Limit Exceeded',
-          message: `${meter.name}: ${todayReading.units.toFixed(1)} kWh (limit: ${meter.limits.daily} kWh)`,
+          message: `${meter.name}: ${todayConsumption.toFixed(1)} kWh (+${percentage}% over ${meter.limits.daily} kWh limit)`,
           type: 'warning',
         });
       }
 
-      if (meter.limits.monthly > 0 && stats.currentMonthTotal > meter.limits.monthly) {
+      // Monthly limit alerts
+      if (settings.notifications.monthlyLimit && meter.limits.monthly > 0 && stats.currentMonthTotal > meter.limits.monthly) {
+        const percentage = ((stats.currentMonthTotal - meter.limits.monthly) / meter.limits.monthly * 100).toFixed(1);
         alerts.push({
           id: `monthly-${meter.id}`,
           title: 'Monthly Limit Exceeded',
-          message: `${meter.name}: ${stats.currentMonthTotal.toFixed(1)} kWh (limit: ${meter.limits.monthly} kWh)`,
+          message: `${meter.name}: ${stats.currentMonthTotal.toFixed(1)} kWh (+${percentage}% over ${meter.limits.monthly} kWh limit)`,
           type: 'error',
         });
       }
-    });
+
+      // High usage alerts (approaching limits)
+      if (meter.limits.daily > 0 && todayConsumption > meter.limits.daily * 0.8 && todayConsumption <= meter.limits.daily) {
+        const percentage = (todayConsumption / meter.limits.daily * 100).toFixed(0);
+        alerts.push({
+          id: `approaching-daily-${meter.id}`,
+          title: 'Approaching Daily Limit',
+          message: `${meter.name}: ${todayConsumption.toFixed(1)} kWh (${percentage}% of daily limit)`,
+          type: 'info',
+        });
+      }
+
+      // Usage trend alerts
+      if (trend === 'increasing' && yesterdayConsumption > 0) {
+        const increase = ((todayConsumption - yesterdayConsumption) / yesterdayConsumption * 100);
+        if (increase > 50) {
+          alerts.push({
+            id: `trend-${meter.id}`,
+            title: 'Usage Spike Detected',
+            message: `${meter.name}: Today's usage is ${increase.toFixed(0)}% higher than yesterday`,
+            type: 'info',
+          });
+        }
+      }
+
+      // Peak usage information
+      if (peakDay && todayConsumption > 0 && todayConsumption >= peakDay.consumption) {
+        alerts.push({
+          id: `peak-${meter.id}`,
+          title: 'New Peak Usage',
+          message: `${meter.name}: Today's usage (${todayConsumption.toFixed(1)} kWh) is your highest recorded!`,
+          type: 'info',
+        });
+      }
+    }
 
     setNotifications(alerts);
+    setLastNotificationCheck(new Date());
+
+    // Trigger system notifications for critical alerts
+    if (settings.notifications.enabled) {
+      await NotificationManager.checkAndNotifyLimits(meters, readings, settings.notifications);
+      await NotificationManager.checkAndNotifyTrends(meters, readings);
+    }
   };
 
   const onRefresh = async () => {
@@ -84,16 +142,36 @@ export default function DashboardScreen() {
   };
 
   const getTotalStats = () => {
-    const allStats = meters.map(meter => 
-      UsageCalculator.getUsageStats(readings, meter.id)
-    );
+    if (meters.length === 0) {
+      return { totalMonthly: 0, totalWeekly: 0, averageChange: 0, totalToday: 0 };
+    }
+
+    let totalMonthly = 0;
+    let totalWeekly = 0;
+    let totalToday = 0;
+    let totalChange = 0;
+    let metersWithData = 0;
+
+    meters.forEach(meter => {
+      const meterReadings = readings.filter(r => r.meterId === meter.id);
+      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+      const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
+      
+      totalMonthly += stats.currentMonthTotal;
+      totalWeekly += stats.currentWeekTotal;
+      totalToday += todayConsumption;
+      
+      if (stats.monthlyChange !== 0) {
+        totalChange += stats.monthlyChange;
+        metersWithData++;
+      }
+    });
 
     return {
-      totalMonthly: allStats.reduce((sum, stats) => sum + stats.currentMonthTotal, 0),
-      totalWeekly: allStats.reduce((sum, stats) => sum + stats.currentWeekTotal, 0),
-      averageChange: allStats.length > 0 
-        ? allStats.reduce((sum, stats) => sum + stats.monthlyChange, 0) / allStats.length 
-        : 0,
+      totalMonthly,
+      totalWeekly,
+      totalToday,
+      averageChange: metersWithData > 0 ? totalChange / metersWithData : 0,
     };
   };
 
@@ -137,15 +215,30 @@ export default function DashboardScreen() {
 
         <View style={styles.summaryContainer}>
           <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Today</Text>
+            <Text style={styles.summaryValue}>
+              {totalStats.totalToday.toFixed(1)} kWh
+            </Text>
+          </View>
+          <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>This Month</Text>
             <Text style={styles.summaryValue}>
               {totalStats.totalMonthly.toFixed(1)} kWh
             </Text>
           </View>
+        </View>
+
+        <View style={styles.summaryContainer}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>This Week</Text>
             <Text style={styles.summaryValue}>
               {totalStats.totalWeekly.toFixed(1)} kWh
+            </Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Weekly Avg</Text>
+            <Text style={styles.summaryValue}>
+              {(totalStats.totalWeekly / 7).toFixed(1)} kWh/day
             </Text>
           </View>
         </View>
@@ -161,6 +254,17 @@ export default function DashboardScreen() {
               { color: totalStats.averageChange > 0 ? colors.warning : colors.success }
             ]}>
               {totalStats.averageChange > 0 ? '+' : ''}{totalStats.averageChange.toFixed(1)}% average change
+            </Text>
+          </View>
+        )}
+
+        {lastNotificationCheck && (
+          <View style={styles.lastUpdateContainer}>
+            <Text style={styles.lastUpdateText}>
+              Last updated: {lastNotificationCheck.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </Text>
           </View>
         )}
@@ -211,6 +315,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: 20
   },
   scrollView: {
     flex: 1,
@@ -263,6 +368,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: colors.text,
+  },
+  lastUpdateContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  lastUpdateText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   changeContainer: {
     flexDirection: 'row',

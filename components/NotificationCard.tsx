@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { TriangleAlert as AlertTriangle, X } from 'lucide-react-native';
+import { TriangleAlert as AlertTriangle, X, Info, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 interface NotificationCardProps {
@@ -26,13 +26,22 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
     }
   };
 
+  const getIcon = () => {
+    switch (type) {
+      case 'warning': return AlertTriangle;
+      case 'error': return AlertCircle;
+      default: return Info;
+    }
+  };
+
+  const Icon = getIcon();
   const styles = createStyles(colors, getTypeColor());
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <AlertTriangle size={20} color={getTypeColor()} />
+          <Icon size={20} color={getTypeColor()} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.title}>{title}</Text>

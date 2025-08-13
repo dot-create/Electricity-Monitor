@@ -33,20 +33,26 @@ export class FormValidator {
     }
   }
 
-  static validateUnits(units: string | number): number {
-    const numUnits = typeof units === 'string' ? parseFloat(units) : units;
+  static validateReading(reading: string | number): number {
+    const numReading = typeof reading === 'string' ? parseFloat(reading) : reading;
     
-    if (isNaN(numUnits)) {
-      throw new ValidationError('Units must be a valid number');
+    if (isNaN(numReading)) {
+      throw new ValidationError('Meter reading must be a valid number');
     }
-    if (numUnits < 0) {
-      throw new ValidationError('Units cannot be negative');
+    if (numReading < 0) {
+      throw new ValidationError('Meter reading cannot be negative');
     }
-    if (numUnits > 10000) {
-      throw new ValidationError('Units seem unusually high (max 10,000 kWh)');
+    if (numReading > 999999.99) {
+      throw new ValidationError('Meter reading seems unusually high (max 999,999.99 kWh)');
     }
     
-    return numUnits;
+    return numReading;
+  }
+
+  static validateReadingSequence(newReading: number, previousReading?: number): void {
+    if (previousReading !== undefined && newReading < previousReading) {
+      throw new ValidationError('New reading cannot be less than previous reading');
+    }
   }
 
   static validateDate(date: string): void {

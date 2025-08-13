@@ -19,17 +19,41 @@ export const MeterCard: React.FC<MeterCardProps> = ({
   onEdit,
 }) => {
   const { colors } = useTheme();
-  const stats = UsageCalculator.getUsageStats(readings, meter.id);
+  const meterReadings = readings.filter(r => r.meterId === meter.id);
+  const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
   
-  const todayReading = readings.find(
-    r => r.meterId === meter.id && r.date === new Date().toISOString().split('T')[0]
-  );
+  const latestReading = UsageCalculator.getLatestReading(meterReadings, meter.id);
+  const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
+  const yesterdayConsumption = UsageCalculator.getYesterdayConsumption(meterReadings, meter.id);
+  const weeklyAverage = UsageCalculator.getWeeklyAverage(meterReadings, meter.id);
+  const trend = UsageCalculator.getConsumptionTrend(meterReadings, meter.id);
+  const readingsCount = UsageCalculator.getMeterReadingsCount(meterReadings, meter.id);
 
   const isOverDailyLimit = meter.limits.daily > 0 && 
-    (todayReading?.units || 0) > meter.limits.daily;
+    todayConsumption > meter.limits.daily;
   
   const isOverMonthlyLimit = meter.limits.monthly > 0 && 
     stats.currentMonthTotal > meter.limits.monthly;
+
+  const isApproachingDailyLimit = meter.limits.daily > 0 && 
+    todayConsumption > meter.limits.daily * 0.8 && 
+    todayConsumption <= meter.limits.daily;
+
+  const getTrendIcon = () => {
+    switch (trend) {
+      case 'increasing': return '📈';
+      case 'decreasing': return '📉';
+      default: return '➡️';
+    }
+  };
+
+  const getTrendColor = () => {
+    switch (trend) {
+      case 'increasing': return colors.warning;
+      case 'decreasing': return colors.success;
+      default: return colors.textSecondary;
+    }
+  };
 
   const styles = createStyles(colors);
 
@@ -37,7 +61,8 @@ export const MeterCard: React.FC<MeterCardProps> = ({
     <TouchableOpacity
       style={[
         styles.card,
-        (isOverDailyLimit || isOverMonthlyLimit) && styles.cardWarning
+        (isOverDailyLimit || isOverMonthlyLimit) && styles.cardWarning,
+        isApproachingDailyLimit && !isOverDailyLimit && styles.cardApproaching
       ]}
       onPress={onPress}
       activeOpacity={0.7}
@@ -46,6 +71,7 @@ export const MeterCard: React.FC<MeterCardProps> = ({
         <View style={styles.titleRow}>
           <Zap size={20} color={colors.primary} />
           <Text style={styles.name}>{meter.name}</Text>
+          <Text style={styles.trendIcon}>{getTrendIcon()}</Text>
         </View>
         <TouchableOpacity onPress={onEdit} style={styles.editButton}>
           <Edit3 size={16} color={colors.textSecondary} />
@@ -61,6 +87,24 @@ export const MeterCard: React.FC<MeterCardProps> = ({
         <Text style={styles.meterId}>ID: {meter.meterId}</Text>
       )}
 
+      <View style={styles.readingsCountContainer}>
+        <Text style={styles.readingsCountText}>
+          {readingsCount} reading{readingsCount !== 1 ? 's' : ''} recorded
+        </Text>
+      </View>
+
+      {latestReading && (
+        <View style={styles.currentReadingContainer}>
+          <Text style={styles.currentReadingLabel}>Current Reading:</Text>
+          <Text style={styles.currentReadingValue}>
+            {latestReading.reading?.toLocaleString()} kWh
+          </Text>
+          <Text style={styles.readingDate}>
+            {new Date(latestReading.date).toLocaleDateString()}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Today</Text>
@@ -68,8 +112,14 @@ export const MeterCard: React.FC<MeterCardProps> = ({
             styles.statValue,
             isOverDailyLimit && styles.statValueWarning
           ]}>
-            {todayReading ? `${todayReading.units.toFixed(1)} kWh` : 'No reading'}
+            {todayConsumption > 0 ? `${todayConsumption.toFixed(1)} kWh` : 'No reading'}
           </Text>
+          {yesterdayConsumption > 0 && todayConsumption > 0 && (
+            <Text style={styles.comparisonText}>
+              {todayConsumption > yesterdayConsumption ? '↑' : '↓'} 
+              {Math.abs(((todayConsumption - yesterdayConsumption) / yesterdayConsumption) * 100).toFixed(0)}% vs yesterday
+            </Text>
+          )}
         </View>
         
         <View style={styles.statItem}>
@@ -80,8 +130,19 @@ export const MeterCard: React.FC<MeterCardProps> = ({
           ]}>
             {stats.currentMonthTotal.toFixed(1)} kWh
           </Text>
+          <Text style={styles.comparisonText}>
+            Avg: {stats.dailyAverage.toFixed(1)} kWh/day
+          </Text>
         </View>
       </View>
+
+      {weeklyAverage > 0 && (
+        <View style={styles.weeklyAverageContainer}>
+          <Text style={styles.weeklyAverageText}>
+            Weekly average: {weeklyAverage.toFixed(1)} kWh/day
+          </Text>
+        </View>
+      )}
 
       {stats.monthlyChange !== 0 && (
         <View style={styles.changeRow}>
@@ -95,6 +156,26 @@ export const MeterCard: React.FC<MeterCardProps> = ({
           ]}>
             {stats.monthlyChange > 0 ? '+' : ''}{stats.monthlyChange.toFixed(1)}% vs last month
           </Text>
+        </View>
+      )}
+
+      {(isOverDailyLimit || isOverMonthlyLimit || isApproachingDailyLimit) && (
+        <View style={styles.alertContainer}>
+          {isOverDailyLimit && (
+            <Text style={styles.alertText}>
+              ⚠️ Daily limit exceeded by {((todayConsumption - meter.limits.daily) / meter.limits.daily * 100).toFixed(0)}%
+            </Text>
+          )}
+          {isOverMonthlyLimit && (
+            <Text style={styles.alertText}>
+              🚨 Monthly limit exceeded by {((stats.currentMonthTotal - meter.limits.monthly) / meter.limits.monthly * 100).toFixed(0)}%
+            </Text>
+          )}
+          {isApproachingDailyLimit && !isOverDailyLimit && (
+            <Text style={styles.warningText}>
+              ⚡ {(todayConsumption / meter.limits.daily * 100).toFixed(0)}% of daily limit used
+            </Text>
+          )}
         </View>
       )}
 
@@ -126,6 +207,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.warning,
     borderWidth: 2,
   },
+  cardApproaching: {
+    borderColor: colors.warning,
+    borderWidth: 1.5,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -141,6 +226,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  trendIcon: {
+    fontSize: 16,
     marginLeft: 8,
   },
   editButton: {
@@ -159,7 +249,37 @@ const createStyles = (colors: any) => StyleSheet.create({
   meterId: {
     fontSize: 12,
     color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  readingsCountContainer: {
+    marginBottom: 8,
+  },
+  readingsCountText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  currentReadingContainer: {
+    backgroundColor: colors.surface,
+    padding: 8,
+    borderRadius: 6,
     marginBottom: 12,
+  },
+  currentReadingLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  currentReadingValue: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  readingDate: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -182,6 +302,22 @@ const createStyles = (colors: any) => StyleSheet.create({
   statValueWarning: {
     color: colors.warning,
   },
+  comparisonText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  weeklyAverageContainer: {
+    backgroundColor: colors.surface,
+    padding: 6,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  weeklyAverageText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   changeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -190,6 +326,24 @@ const createStyles = (colors: any) => StyleSheet.create({
   changeText: {
     fontSize: 12,
     marginLeft: 4,
+    fontWeight: '500',
+  },
+  alertContainer: {
+    backgroundColor: colors.surface,
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+  },
+  alertText: {
+    fontSize: 12,
+    color: colors.error,
+    fontWeight: '500',
+  },
+  warningText: {
+    fontSize: 12,
+    color: colors.warning,
     fontWeight: '500',
   },
   footer: {

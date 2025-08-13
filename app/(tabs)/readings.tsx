@@ -18,6 +18,7 @@ import { useReadings } from '@/hooks/useReadings';
 import { Reading } from '@/types';
 import { FormValidator, ValidationError } from '@/utils/validation';
 import { useLocalSearchParams } from 'expo-router';
+import { UsageCalculator } from '@/utils/calculations';
 
 export default function ReadingsScreen() {
   const { colors } = useTheme();
@@ -31,7 +32,7 @@ export default function ReadingsScreen() {
   const [editingReading, setEditingReading] = useState<Reading | null>(null);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    units: '',
+    reading: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -61,20 +62,36 @@ export default function ReadingsScreen() {
     }
 
     try {
-      FormValidator.validateUnits(formData.units);
+      FormValidator.validateReading(formData.reading);
     } catch (err) {
       if (err instanceof ValidationError) {
-        errors.units = err.message;
+        errors.reading = err.message;
       }
     }
 
     // Check for duplicate entry (only when adding, not editing)
     if (!editingReading) {
-      const duplicate = readings.find(
-        r => r.meterId === selectedMeterId && r.date === formData.date
-      );
+      const duplicate = meterReadings.find(r => r.date === formData.date);
       if (duplicate) {
         errors.date = 'Reading already exists for this date';
+      }
+    }
+
+    // Validate reading sequence
+    if (!editingReading && formData.reading) {
+      try {
+        const newReading = parseFloat(formData.reading);
+        const previousReading = meterReadings
+          .filter(r => new Date(r.date) < new Date(formData.date))
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+        
+        if (previousReading) {
+          FormValidator.validateReadingSequence(newReading, previousReading.reading);
+        }
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          errors.reading = err.message;
+        }
       }
     }
 
@@ -87,12 +104,12 @@ export default function ReadingsScreen() {
 
     setSubmitting(true);
     try {
-      const units = parseFloat(formData.units);
+      const reading = parseFloat(formData.reading);
 
       if (editingReading) {
-        await updateReading(editingReading.id, units);
+        await updateReading(editingReading.id, reading);
       } else {
-        await addReading(selectedMeterId, formData.date, units);
+        await addReading(selectedMeterId, formData.date, reading);
       }
 
       resetForm();
@@ -116,7 +133,7 @@ export default function ReadingsScreen() {
     setEditingReading(reading);
     setFormData({
       date: reading.date,
-      units: reading.units.toString(),
+      reading: reading.reading?.toString(),
     });
     setShowForm(true);
   };
@@ -139,7 +156,7 @@ export default function ReadingsScreen() {
   const resetForm = () => {
     setFormData({
       date: new Date().toISOString().split('T')[0],
-      units: '',
+      reading: '',
     });
     setFormErrors({});
     setEditingReading(null);
@@ -165,6 +182,8 @@ export default function ReadingsScreen() {
     );
   }
 
+  const readingsWithConsumption = UsageCalculator.calculateConsumption(meterReadings);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -187,7 +206,7 @@ export default function ReadingsScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {meterReadings.length === 0 ? (
+        {readingsWithConsumption.length === 0 ? (
           <View style={styles.emptyState}>
             <Calendar size={48} color={colors.textSecondary} />
             <Text style={styles.emptyText}>No readings recorded</Text>
@@ -196,7 +215,7 @@ export default function ReadingsScreen() {
             </Text>
           </View>
         ) : (
-          meterReadings.map(reading => (
+          readingsWithConsumption.map(reading => (
             <View key={reading.id} style={styles.readingItem}>
               <View style={styles.readingInfo}>
                 <Text style={styles.readingDate}>
@@ -207,9 +226,14 @@ export default function ReadingsScreen() {
                     day: 'numeric',
                   })}
                 </Text>
-                <Text style={styles.readingUnits}>
-                  {reading.units.toFixed(1)} kWh
+                <Text style={styles.readingValue}>
+                  {reading.reading?.toLocaleString()} kWh
                 </Text>
+                {reading.consumption !== undefined && reading.consumption > 0 && (
+                  <Text style={styles.consumptionText}>
+                    Consumption: {reading.consumption.toFixed(1)} kWh
+                  </Text>
+                )}
                 <Text style={styles.readingTime}>
                   Added {new Date(reading.timestamp).toLocaleTimeString('en-US', {
                     hour: '2-digit',
@@ -304,6 +328,18 @@ export default function ReadingsScreen() {
               Recording for: {selectedMeter?.name}
             </Text>
 
+            {!editingReading && meterReadings.length > 0 && (
+              <View style={styles.previousReadingContainer}>
+                <Text style={styles.previousReadingLabel}>Previous Reading:</Text>
+                <Text style={styles.previousReadingValue}>
+                  {meterReadings[0].reading?.toLocaleString()} kWh
+                </Text>
+                <Text style={styles.previousReadingDate}>
+                  on {new Date(meterReadings[0].date).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.formGroup}>
               <Text style={styles.label}>Date *</Text>
               <TextInput
@@ -320,18 +356,21 @@ export default function ReadingsScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Units Consumed (kWh) *</Text>
+              <Text style={styles.label}>Meter Reading (kWh) *</Text>
               <TextInput
-                style={[styles.input, formErrors.units && styles.inputError]}
-                value={formData.units}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, units: text }))}
-                placeholder="e.g., 15.5"
+                style={[styles.input, formErrors.reading && styles.inputError]}
+                value={formData.reading}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, reading: text }))}
+                placeholder="e.g., 004023.12"
                 placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
               />
-              {formErrors.units && (
-                <Text style={styles.errorText}>{formErrors.units}</Text>
+              {formErrors.reading && (
+                <Text style={styles.errorText}>{formErrors.reading}</Text>
               )}
+              <Text style={styles.helpText}>
+                Enter the current reading shown on your electricity meter
+              </Text>
             </View>
 
             <View style={styles.formActions}>
@@ -362,6 +401,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: 20
   },
   header: {
     flexDirection: 'row',
@@ -422,10 +462,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text,
     marginBottom: 2,
   },
-  readingUnits: {
+  readingValue: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.primary,
+    marginBottom: 2,
+  },
+  consumptionText: {
+    fontSize: 14,
+    color: colors.secondary,
+    fontWeight: '500',
     marginBottom: 2,
   },
   readingTime: {
@@ -532,6 +578,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  previousReadingContainer: {
+    backgroundColor: colors.surface,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  previousReadingLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  previousReadingValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  previousReadingDate: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   formGroup: {
     marginBottom: 20,
   },
@@ -557,6 +626,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     marginTop: 4,
+  },
+  helpText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   formActions: {
     flexDirection: 'row',
