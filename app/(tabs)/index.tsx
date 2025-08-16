@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   SafeAreaView,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
 import { Plus, Activity, TrendingUp, Zap } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
@@ -176,7 +177,9 @@ export default function DashboardScreen() {
   };
 
   const totalStats = getTotalStats();
-  const styles = createStyles(colors);
+  // const styles = createStyles(colors);
+  // 💡 Use useMemo so styles react to theme changes
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   if (loading && meters.length === 0) {
     return (
@@ -191,6 +194,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle={'light-content'} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
