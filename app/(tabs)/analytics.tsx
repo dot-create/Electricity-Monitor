@@ -6,14 +6,17 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal
+  Modal,
+  Modal as RNModal
 } from 'react-native';
-import { ChartBar as BarChart3, TrendingUp, TrendingDown, Activity, ChevronDown, X } from 'lucide-react-native';
+import { ChartBar as BarChart3, TrendingUp, TrendingDown, Activity, ChevronDown, X as CloseIcon } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { useReadings } from '@/hooks/useReadings';
 import { ReadingChart } from '@/components/ReadingChart';
+import { ForecastCard } from '@/components/ForecastCard';
 import { UsageCalculator } from '@/utils/calculations';
+import { ForecastingEngine } from '@/utils/forecasting';
 
 export default function AnalyticsScreen() {
   const { colors } = useTheme();
@@ -112,6 +115,12 @@ export default function AnalyticsScreen() {
   const topConsumer = getTopConsumer();
   const averageReading = getAverageReading();
   const meterInsights = getMeterInsights();
+  const forecast = selectedMeterId !== 'all' && selectedMeter 
+    ? ForecastingEngine.generateForecast(readings, selectedMeterId)
+    : null;
+  const recommendations = selectedMeterId !== 'all' 
+    ? ForecastingEngine.getUsageRecommendations(readings, selectedMeterId)
+    : [];
   const styles = createStyles(colors);
 
   if (meters.length === 0) {
@@ -267,6 +276,21 @@ export default function AnalyticsScreen() {
           </View>
         )}
 
+        {forecast && selectedMeter && (
+          <ForecastCard forecast={forecast} meterName={selectedMeter.name} />
+        )}
+
+        {recommendations.length > 0 && (
+          <View style={styles.recommendationsContainer}>
+            <Text style={styles.recommendationsTitle}>💡 Smart Recommendations</Text>
+            {recommendations.map((recommendation, index) => (
+              <View key={index} style={styles.recommendationItem}>
+                <Text style={styles.recommendationText}>{recommendation}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {selectedMeterId !== 'all' && selectedMeter && (
           <ReadingChart
             readings={readings}
@@ -345,7 +369,7 @@ export default function AnalyticsScreen() {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowMeterPicker(false)}>
-              <X size={24} color={colors.text} />
+              <CloseIcon size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select View</Text>
             <View style={{ width: 24 }} />
@@ -391,7 +415,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: 20
   },
   header: {
     flexDirection: 'row',
@@ -649,6 +672,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     width: 32,
     textAlign: 'right',
+  },
+  recommendationsContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  recommendationsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  recommendationItem: {
+    backgroundColor: colors.surface,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  recommendationText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
   },
   emptyContainer: {
     flex: 1,

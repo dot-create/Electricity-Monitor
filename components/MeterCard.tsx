@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Zap, MapPin, Calendar, TrendingUp, CreditCard as Edit3 } from 'lucide-react-native';
+import { Zap, MapPin, Calendar, TrendingUp, CreditCard as Edit3, DollarSign, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { Meter, Reading, UsageStats } from '@/types';
 import { useTheme } from '@/hooks/useTheme';
 import { UsageCalculator } from '@/utils/calculations';
@@ -28,6 +28,8 @@ export const MeterCard: React.FC<MeterCardProps> = ({
   const weeklyAverage = UsageCalculator.getWeeklyAverage(meterReadings, meter.id);
   const trend = UsageCalculator.getConsumptionTrend(meterReadings, meter.id);
   const readingsCount = UsageCalculator.getMeterReadingsCount(meterReadings, meter.id);
+  const todayCost = meter.tariff ? todayConsumption * meter.tariff.rate : 0;
+  const monthlyCost = meter.tariff ? stats.currentMonthTotal * meter.tariff.rate : 0;
 
   const isOverDailyLimit = meter.limits.daily > 0 && 
     todayConsumption > meter.limits.daily;
@@ -87,6 +89,17 @@ export const MeterCard: React.FC<MeterCardProps> = ({
         <Text style={styles.meterId}>ID: {meter.meterId}</Text>
       )}
 
+      <View style={styles.categoryContainer}>
+        <Text style={styles.categoryText}>
+          {meter.category.charAt(0).toUpperCase() + meter.category.slice(1)}
+        </Text>
+        {!meter.isActive && (
+          <View style={styles.inactiveBadge}>
+            <Text style={styles.inactiveText}>Inactive</Text>
+          </View>
+        )}
+      </View>
+
       <View style={styles.readingsCountContainer}>
         <Text style={styles.readingsCountText}>
           {readingsCount} reading{readingsCount !== 1 ? 's' : ''} recorded
@@ -114,6 +127,11 @@ export const MeterCard: React.FC<MeterCardProps> = ({
           ]}>
             {todayConsumption > 0 ? `${todayConsumption.toFixed(1)} kWh` : 'No reading'}
           </Text>
+          {todayCost > 0 && (
+            <Text style={styles.costText}>
+              ${todayCost.toFixed(2)}
+            </Text>
+          )}
           {yesterdayConsumption > 0 && todayConsumption > 0 && (
             <Text style={styles.comparisonText}>
               {todayConsumption > yesterdayConsumption ? '↑' : '↓'} 
@@ -130,6 +148,11 @@ export const MeterCard: React.FC<MeterCardProps> = ({
           ]}>
             {stats.currentMonthTotal.toFixed(1)} kWh
           </Text>
+          {monthlyCost > 0 && (
+            <Text style={styles.costText}>
+              ${monthlyCost.toFixed(2)}
+            </Text>
+          )}
           <Text style={styles.comparisonText}>
             Avg: {stats.dailyAverage.toFixed(1)} kWh/day
           </Text>
@@ -251,6 +274,31 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 4,
   },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  categoryText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  inactiveBadge: {
+    backgroundColor: colors.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  inactiveText: {
+    fontSize: 10,
+    color: colors.background,
+    fontWeight: '600',
+  },
   readingsCountContainer: {
     marginBottom: 8,
   },
@@ -298,6 +346,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+  },
+  costText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '500',
+    marginTop: 2,
   },
   statValueWarning: {
     color: colors.warning,
