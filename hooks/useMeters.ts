@@ -31,7 +31,9 @@ export const useMeters = () => {
     location: string,
     meterId?: string,
     dailyLimit: number = 0,
-    monthlyLimit: number = 0
+    monthlyLimit: number = 0,
+    category: 'residential' | 'commercial' | 'industrial' = 'residential',
+    tariff?: { rate: number; currency: string }
   ): Promise<void> => {
     try {
       FormValidator.validateMeterName(name);
@@ -48,6 +50,9 @@ export const useMeters = () => {
           daily: dailyLimit,
           monthly: monthlyLimit,
         },
+        category,
+        tariff,
+        isActive: true,
       };
 
       const updatedMeters = [...meters, newMeter];

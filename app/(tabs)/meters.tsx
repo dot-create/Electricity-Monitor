@@ -9,8 +9,9 @@ import {
   Alert,
   SafeAreaView,
   Modal,
+  Switch,
 } from 'react-native';
-import { Plus, CreditCard as Edit3, Trash2, Save, X } from 'lucide-react-native';
+import { Plus, CreditCard as Edit3, Trash2, Save, X, DollarSign, ChevronDown } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { Meter } from '@/types';
@@ -23,6 +24,10 @@ interface FormData {
   meterId: string;
   dailyLimit: string;
   monthlyLimit: string;
+  category: 'residential' | 'commercial' | 'industrial';
+  tariffRate: string;
+  currency: string;
+  isActive: boolean;
 }
 
 export default function MetersScreen() {
@@ -38,6 +43,10 @@ export default function MetersScreen() {
     meterId: '',
     dailyLimit: '',
     monthlyLimit: '',
+    category: 'residential',
+    tariffRate: '',
+    currency: 'USD',
+    isActive: true,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -53,6 +62,10 @@ export default function MetersScreen() {
           meterId: meterToEdit.meterId || '',
           dailyLimit: meterToEdit.limits.daily.toString(),
           monthlyLimit: meterToEdit.limits.monthly.toString(),
+          category: meterToEdit.category,
+          tariffRate: meterToEdit.tariff?.rate.toString() || '',
+          currency: meterToEdit.tariff?.currency || 'USD',
+          isActive: meterToEdit.isActive,
         });
         setShowForm(true);
       }
@@ -117,6 +130,7 @@ export default function MetersScreen() {
     try {
       const dailyLimit = formData.dailyLimit ? parseFloat(formData.dailyLimit) : 0;
       const monthlyLimit = formData.monthlyLimit ? parseFloat(formData.monthlyLimit) : 0;
+      const tariffRate = formData.tariffRate ? parseFloat(formData.tariffRate) : 0;
 
       if (editingMeter) {
         await updateMeter(editingMeter.id, {
@@ -124,6 +138,9 @@ export default function MetersScreen() {
           location: formData.location,
           meterId: formData.meterId || undefined,
           limits: { daily: dailyLimit, monthly: monthlyLimit },
+          category: formData.category,
+          tariff: tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined,
+          isActive: formData.isActive,
         });
       } else {
         await addMeter(
@@ -131,7 +148,9 @@ export default function MetersScreen() {
           formData.location,
           formData.meterId || undefined,
           dailyLimit,
-          monthlyLimit
+          monthlyLimit,
+          formData.category,
+          tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined
         );
       }
 
@@ -166,6 +185,10 @@ export default function MetersScreen() {
       meterId: '',
       dailyLimit: '',
       monthlyLimit: '',
+      category: 'residential',
+      tariffRate: '',
+      currency: 'USD',
+      isActive: true,
     });
     setFormErrors({});
     setEditingMeter(null);
@@ -207,6 +230,15 @@ export default function MetersScreen() {
                   Daily: {meter.limits.daily || 'No limit'} kWh | 
                   Monthly: {meter.limits.monthly || 'No limit'} kWh
                 </Text>
+                <Text style={styles.categoryText}>
+                  {meter.category?.charAt(0).toUpperCase() + meter.category?.slice(1)} • 
+                  {meter.tariff ? ` $${meter.tariff.rate}/kWh` : ' No tariff set'}
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: meter.isActive ? colors.success : colors.error }]}>
+                  <Text style={styles.statusText}>
+                    {meter.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.meterActions}>
@@ -220,6 +252,10 @@ export default function MetersScreen() {
                     meterId: meter.meterId || '',
                     dailyLimit: meter.limits.daily.toString(),
                     monthlyLimit: meter.limits.monthly.toString(),
+                    category: meter.category,
+                    tariffRate: meter.tariff?.rate.toString() || '',
+                    currency: meter.tariff?.currency || 'USD',
+                    isActive: meter.isActive,
                   });
                   setShowForm(true);
                 }}
@@ -348,6 +384,59 @@ export default function MetersScreen() {
               )}
             </View>
 
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Meter Category</Text>
+              <View style={styles.categorySelector}>
+                {(['residential', 'commercial', 'industrial'] as const).map(category => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryButton,
+                      formData.category === category && styles.categoryButtonActive
+                    ]}
+                    onPress={() => setFormData(prev => ({ ...prev, category }))}
+                  >
+                    <Text style={[
+                      styles.categoryButtonText,
+                      formData.category === category && styles.categoryButtonTextActive
+                    ]}>
+                      {category?.charAt(0).toUpperCase() + category?.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.tariffContainer}>
+              <Text style={styles.label}>Electricity Tariff (Optional)</Text>
+              <View style={styles.tariffRow}>
+                <TextInput
+                  style={[styles.input, styles.tariffInput]}
+                  value={formData.tariffRate}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, tariffRate: text }))}
+                  placeholder="0.12"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.tariffUnit}>per kWh</Text>
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <View style={styles.switchRow}>
+                <Text style={styles.label}>Active Meter</Text>
+                <Switch
+                  value={formData.isActive}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, isActive: value }))}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.background}
+                />
+              </View>
+              <Text style={styles.helpText}>
+                Inactive meters won't appear in dashboard summaries
+              </Text>
+            </View>
+
             <View style={styles.formActions}>
               <TouchableOpacity
                 style={styles.cancelButton}
@@ -376,7 +465,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: 20
   },
   header: {
     flexDirection: 'row',
@@ -441,6 +529,23 @@ const createStyles = (colors: any) => StyleSheet.create({
   limitsText: {
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  categoryText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 10,
+    color: colors.background,
+    fontWeight: '600',
   },
   meterActions: {
     flexDirection: 'row',
@@ -519,6 +624,49 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 4,
   },
   formActions: {
+  categorySelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  categoryButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  categoryButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryButtonText: {
+    fontSize: 12,
+    color: colors.text,
+  },
+  categoryButtonTextActive: {
+    color: colors.background,
+  },
+  tariffContainer: {
+    marginBottom: 20,
+  },
+  tariffRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tariffInput: {
+    flex: 1,
+  },
+  tariffUnit: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
     flexDirection: 'row',
     gap: 12,
     marginTop: 24,

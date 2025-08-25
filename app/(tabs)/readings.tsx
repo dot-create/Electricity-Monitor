@@ -11,10 +11,12 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import { Calendar, Plus, CreditCard as Edit3, Trash2, Save, X, ChevronDown } from 'lucide-react-native';
+import { Calendar, Plus, CreditCard as Edit3, Trash2, Save, X, ChevronDown, Camera, Zap } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { useReadings } from '@/hooks/useReadings';
+import { CameraReadingModal } from '@/components/CameraReadingModal';
+import { EnhancedMeterCard } from '@/components/EnhancedMeterCard';
 import { Reading } from '@/types';
 import { FormValidator, ValidationError } from '@/utils/validation';
 import { useLocalSearchParams } from 'expo-router';
@@ -29,6 +31,7 @@ export default function ReadingsScreen() {
   const [selectedMeterId, setSelectedMeterId] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
   const [showMeterPicker, setShowMeterPicker] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [editingReading, setEditingReading] = useState<Reading | null>(null);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -167,6 +170,16 @@ export default function ReadingsScreen() {
     setShowForm(false);
   };
 
+  const handleCameraReading = async (value: number, imageUri?: string) => {
+    try {
+      await addReading(selectedMeterId, new Date().toISOString().split('T')[0], value);
+      setShowCameraModal(false);
+      Alert.alert('Success', 'Reading added successfully using camera!');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save reading');
+    }
+  };
+
   const styles = createStyles(colors);
 
   if (meters.length === 0) {
@@ -196,13 +209,22 @@ export default function ReadingsScreen() {
           </Text>
           <ChevronDown size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowForm(true)}
-          disabled={!selectedMeterId}
-        >
-          <Plus size={20} color={colors.background} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={() => setShowCameraModal(true)}
+            disabled={!selectedMeterId}
+          >
+            <Camera size={18} color={colors.background} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowForm(true)}
+            disabled={!selectedMeterId}
+          >
+            <Plus size={18} color={colors.background} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
@@ -296,6 +318,16 @@ export default function ReadingsScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Camera Reading Modal */}
+      {selectedMeter && (
+        <CameraReadingModal
+          visible={showCameraModal}
+          meter={selectedMeter}
+          onClose={() => setShowCameraModal(false)}
+          onReadingConfirmed={handleCameraReading}
+        />
+      )}
 
       {/* Reading Form Modal */}
       <Modal
@@ -401,7 +433,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: 20
   },
   header: {
     flexDirection: 'row',
@@ -427,6 +458,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cameraButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addButton: {
     backgroundColor: colors.primary,

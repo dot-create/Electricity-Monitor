@@ -2,7 +2,7 @@
   "expo": {
     "name": "Electricity Monitor",
     "slug": "electricity-monitor-app",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -31,7 +31,15 @@
       }
     },
     "android": {
-      "package": "com.honeyapps.electricitymonitorapp"
+      "package": "com.honeyapps.electricitymonitorapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "versionCode": 1
     }
   }
 }

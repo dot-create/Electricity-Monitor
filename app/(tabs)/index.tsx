@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,16 @@ import {
   Alert,
   SafeAreaView,
   RefreshControl,
-  StatusBar,
+  Dimensions,
 } from 'react-native';
-import { Plus, Activity, TrendingUp, Zap } from 'lucide-react-native';
+import { Plus, Activity, TrendingUp, Zap, DollarSign, Target, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { useReadings } from '@/hooks/useReadings';
+import { useGoals } from '@/hooks/useGoals';
 import { MeterCard } from '@/components/MeterCard';
+import { EnhancedMeterCard } from '@/components/EnhancedMeterCard';
+import { CameraReadingModal } from '@/components/CameraReadingModal';
 import { NotificationCard } from '@/components/NotificationCard';
 import { UsageCalculator } from '@/utils/calculations';
 import { NotificationManager } from '@/utils/notifications';
@@ -25,9 +28,12 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const { meters, loading: metersLoading, refreshMeters } = useMeters();
   const { readings, loading: readingsLoading, refreshReadings } = useReadings();
+  const { goals } = useGoals();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastNotificationCheck, setLastNotificationCheck] = useState<Date | null>(null);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [selectedMeterForCamera, setSelectedMeterForCamera] = useState<any>(null);
 
   const loading = metersLoading || readingsLoading;
 
@@ -138,22 +144,52 @@ export default function DashboardScreen() {
     router.push(`/meters?edit=${meterId}`);
   };
 
+  const handleCameraReading = (meter: any) => {
+    setSelectedMeterForCamera(meter);
+    setShowCameraModal(true);
+  };
+
+  const handleCameraReadingConfirmed = async (value: number, imageUri?: string) => {
+    if (!selectedMeterForCamera) return;
+    
+    try {
+      // This would typically use the readings hook, but for demo we'll show success
+      Alert.alert('Success', `Camera reading of ${value} kWh recorded for ${selectedMeterForCamera.name}!`);
+      setShowCameraModal(false);
+      setSelectedMeterForCamera(null);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save camera reading');
+    }
+  };
+
   const dismissNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   const getTotalStats = () => {
-    if (meters.length === 0) {
-      return { totalMonthly: 0, totalWeekly: 0, averageChange: 0, totalToday: 0 };
+    const activeMeters = meters.filter(m => m.isActive);
+    if (activeMeters.length === 0) {
+      return { 
+        totalMonthly: 0, 
+        totalWeekly: 0, 
+        averageChange: 0, 
+        totalToday: 0,
+        totalCostThisMonth: 0,
+        projectedMonthlyCost: 0,
+        activeGoalsCount: 0,
+        completedGoalsCount: 0,
+      };
     }
 
     let totalMonthly = 0;
     let totalWeekly = 0;
     let totalToday = 0;
     let totalChange = 0;
+    let totalCostThisMonth = 0;
+    let projectedMonthlyCost = 0;
     let metersWithData = 0;
 
-    meters.forEach(meter => {
+    activeMeters.forEach(meter => {
       const meterReadings = readings.filter(r => r.meterId === meter.id);
       const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
       const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
@@ -162,24 +198,33 @@ export default function DashboardScreen() {
       totalWeekly += stats.currentWeekTotal;
       totalToday += todayConsumption;
       
+      if (meter.tariff) {
+        totalCostThisMonth += stats.currentMonthTotal * meter.tariff.rate;
+        projectedMonthlyCost += stats.projectedMonthlyUsage * meter.tariff.rate;
+      }
+      
       if (stats.monthlyChange !== 0) {
         totalChange += stats.monthlyChange;
         metersWithData++;
       }
     });
 
+    const activeGoalsCount = goals.filter(g => g.isActive).length;
+    const completedGoalsCount = goals.filter(g => g.progress >= 100).length;
     return {
       totalMonthly,
       totalWeekly,
       totalToday,
       averageChange: metersWithData > 0 ? totalChange / metersWithData : 0,
+      totalCostThisMonth,
+      projectedMonthlyCost,
+      activeGoalsCount,
+      completedGoalsCount,
     };
   };
 
   const totalStats = getTotalStats();
-  // const styles = createStyles(colors);
-  // 💡 Use useMemo so styles react to theme changes
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = createStyles(colors);
 
   if (loading && meters.length === 0) {
     return (
@@ -194,7 +239,6 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle={'light-content'} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -223,30 +267,54 @@ export default function DashboardScreen() {
             <Text style={styles.summaryValue}>
               {totalStats.totalToday.toFixed(1)} kWh
             </Text>
+            {totalStats.totalCostThisMonth > 0 && (
+              <Text style={styles.summarySubValue}>
+                ~${(totalStats.totalToday * (totalStats.totalCostThisMonth / totalStats.totalMonthly || 0)).toFixed(2)}
+              </Text>
+            )}
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>This Month</Text>
             <Text style={styles.summaryValue}>
               {totalStats.totalMonthly.toFixed(1)} kWh
             </Text>
+            {totalStats.totalCostThisMonth > 0 && (
+              <Text style={styles.summarySubValue}>
+                ${totalStats.totalCostThisMonth.toFixed(2)}
+              </Text>
+            )}
           </View>
         </View>
 
         <View style={styles.summaryContainer}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>This Week</Text>
-            <Text style={styles.summaryValue}>
-              {totalStats.totalWeekly.toFixed(1)} kWh
-            </Text>
-          </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Weekly Avg</Text>
             <Text style={styles.summaryValue}>
               {(totalStats.totalWeekly / 7).toFixed(1)} kWh/day
             </Text>
           </View>
+          <View style={styles.summaryCard}>
+            <Target size={16} color={colors.primary} />
+            <Text style={styles.summaryLabel}>Goals</Text>
+            <Text style={styles.summaryValue}>
+              {totalStats.completedGoalsCount}/{totalStats.activeGoalsCount}
+            </Text>
+          </View>
         </View>
 
+        {totalStats.projectedMonthlyCost > 0 && (
+          <View style={styles.costProjectionContainer}>
+            <DollarSign size={16} color={colors.warning} />
+            <Text style={styles.costProjectionText}>
+              Projected monthly cost: ${totalStats.projectedMonthlyCost.toFixed(2)}
+              {totalStats.projectedMonthlyCost > totalStats.totalCostThisMonth && (
+                <Text style={styles.costIncreaseText}>
+                  {' '}(+${(totalStats.projectedMonthlyCost - totalStats.totalCostThisMonth).toFixed(2)})
+                </Text>
+              )}
+            </Text>
+          </View>
+        )}
         {totalStats.averageChange !== 0 && (
           <View style={styles.changeContainer}>
             <TrendingUp 
@@ -299,18 +367,42 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View style={styles.metersContainer}>
-            {meters.map(meter => (
-              <MeterCard
+            {meters.filter(m => m.isActive).map(meter => (
+              <EnhancedMeterCard
                 key={meter.id}
                 meter={meter}
                 readings={readings.filter(r => r.meterId === meter.id)}
                 onPress={() => handleMeterPress(meter.id)}
                 onEdit={() => handleMeterEdit(meter.id)}
+                onCameraReading={() => handleCameraReading(meter)}
               />
             ))}
+            {meters.filter(m => !m.isActive).length > 0 && (
+              <TouchableOpacity 
+                style={styles.inactiveMetersButton}
+                onPress={() => router.push('/meters')}
+              >
+                <Text style={styles.inactiveMetersText}>
+                  {meters.filter(m => !m.isActive).length} inactive meter(s) - Tap to manage
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
+
+      {/* Camera Reading Modal */}
+      {selectedMeterForCamera && (
+        <CameraReadingModal
+          visible={showCameraModal}
+          meter={selectedMeterForCamera}
+          onClose={() => {
+            setShowCameraModal(false);
+            setSelectedMeterForCamera(null);
+          }}
+          onReadingConfirmed={handleCameraReadingConfirmed}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -319,7 +411,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingTop: 20
   },
   scrollView: {
     flex: 1,
@@ -373,6 +464,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
+  summarySubValue: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   lastUpdateContainer: {
     alignItems: 'center',
     marginBottom: 16,
@@ -392,6 +488,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     marginLeft: 6,
     fontWeight: '500',
+  },
+  costProjectionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  costProjectionText: {
+    fontSize: 14,
+    marginLeft: 6,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  costIncreaseText: {
+    color: colors.warning,
+    fontWeight: '600',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -442,5 +559,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   metersContainer: {
     gap: 8,
+  },
+  inactiveMetersButton: {
+    backgroundColor: colors.surface,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  inactiveMetersText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
 });

@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Zap, ChartBar as BarChart3, BookOpen, Settings } from 'lucide-react-native';
+import { Chrome as Home, Zap, ChartBar as BarChart3, BookOpen, Settings, Target } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function TabLayout() {
@@ -17,7 +17,7 @@ export default function TabLayout() {
           borderTopWidth: 1,
           paddingTop: 8,
           paddingBottom: 8,
-          height: 70,
+          height: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -59,6 +59,15 @@ export default function TabLayout() {
           title: 'Analytics',
           tabBarIcon: ({ size, color }) => (
             <BarChart3 size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{
+          title: 'Goals',
+          tabBarIcon: ({ size, color }) => (
+            <Target size={size} color={color} />
           ),
         }}
       />
