@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   SETTINGS: '@settings',
   MAINTENANCE: '@maintenance',
   GOALS: '@goals',
+  BILLING_CYCLES: '@billing_cycles',
+  ALERTS: '@alerts',
   BACKUP_TIMESTAMP: '@backup_timestamp',
   USER_PREFERENCES: '@user_preferences',
 };
@@ -66,6 +68,10 @@ export class StorageManager {
           monthlyReport: true,
           unusualUsage: true,
           maintenanceReminders: true,
+          billingCycleAlerts: true,
+          costAlerts: true,
+          efficiencyTips: true,
+          weatherAlerts: false,
         },
         currency: 'USD',
         dateFormat: 'MM/DD/YYYY',
@@ -86,6 +92,10 @@ export class StorageManager {
           monthlyReport: true,
           unusualUsage: true,
           maintenanceReminders: true,
+          billingCycleAlerts: true,
+          costAlerts: true,
+          efficiencyTips: true,
+          weatherAlerts: false,
         },
         currency: 'USD',
         dateFormat: 'MM/DD/YYYY',
@@ -143,6 +153,45 @@ export class StorageManager {
     }
   }
 
+  static async getBillingCycles(): Promise<BillingCycle[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.BILLING_CYCLES);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error loading billing cycles:', error);
+      return [];
+    }
+  }
+
+  static async saveBillingCycles(cycles: BillingCycle[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.BILLING_CYCLES, JSON.stringify(cycles));
+      await this.updateBackupTimestamp();
+    } catch (error) {
+      console.error('Error saving billing cycles:', error);
+      throw error;
+    }
+  }
+
+  static async getAlerts(): Promise<Alert[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.ALERTS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+      return [];
+    }
+  }
+
+  static async saveAlerts(alerts: Alert[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(alerts));
+    } catch (error) {
+      console.error('Error saving alerts:', error);
+      throw error;
+    }
+  }
+
   static async updateBackupTimestamp(): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.BACKUP_TIMESTAMP, new Date().toISOString());
@@ -168,16 +217,20 @@ export class StorageManager {
       const settings = await this.getSettings();
       const maintenance = await this.getMaintenanceRecords();
       const goals = await this.getEnergyGoals();
+      const billingCycles = await this.getBillingCycles();
+      const alerts = await this.getAlerts();
       
       return JSON.stringify({
-        version: '2.0',
+        version: '3.0',
         meters,
         readings,
         settings,
         maintenance,
         goals,
+        billingCycles,
+        alerts,
         exportDate: new Date().toISOString(),
-        appVersion: '1.0.0',
+        appVersion: '2.0.0',
       }, null, 2);
     } catch (error) {
       console.error('Error exporting data:', error);
@@ -199,6 +252,8 @@ export class StorageManager {
       if (data.settings) await this.saveSettings(data.settings);
       if (data.maintenance) await this.saveMaintenanceRecords(data.maintenance);
       if (data.goals) await this.saveEnergyGoals(data.goals);
+      if (data.billingCycles) await this.saveBillingCycles(data.billingCycles);
+      if (data.alerts) await this.saveAlerts(data.alerts);
       
       await this.updateBackupTimestamp();
     } catch (error) {
@@ -215,6 +270,8 @@ export class StorageManager {
         STORAGE_KEYS.SETTINGS,
         STORAGE_KEYS.MAINTENANCE,
         STORAGE_KEYS.GOALS,
+        STORAGE_KEYS.BILLING_CYCLES,
+        STORAGE_KEYS.ALERTS,
         STORAGE_KEYS.BACKUP_TIMESTAMP,
       ]);
     } catch (error) {

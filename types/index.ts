@@ -11,11 +11,27 @@ export interface Meter {
   tariff?: {
     rate: number; // per kWh
     currency: string;
+    timeOfUseRates?: {
+      peak: { rate: number; hours: string[] };
+      offPeak: { rate: number; hours: string[] };
+    };
   };
   category: 'residential' | 'commercial' | 'industrial';
   isActive: boolean;
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
+  billingCycle: {
+    startDay: number; // 1-31, day of month when billing cycle starts
+    endDay: number;
+    currentCycleStart: string;
+    currentCycleEnd: string;
+  };
+  connectionDetails?: {
+    voltage: number;
+    amperage: number;
+    phases: 1 | 3;
+    connectionType: 'overhead' | 'underground';
+  };
 }
 
 export interface Reading {
@@ -29,6 +45,60 @@ export interface Reading {
   notes?: string;
   photoUri?: string; // Optional photo of meter reading
   isEstimated?: boolean; // Flag for estimated readings
+  billingCycle?: string; // Which billing cycle this reading belongs to
+  timeOfDay?: 'peak' | 'offPeak' | 'standard';
+  temperature?: number; // Ambient temperature when reading was taken
+  powerFactor?: number; // For commercial/industrial meters
+}
+
+export interface BillingCycle {
+  id: string;
+  meterId: string;
+  startDate: string;
+  endDate: string;
+  startReading: number;
+  endReading?: number;
+  totalConsumption: number;
+  totalCost: number;
+  averageDailyUsage: number;
+  peakUsage: number;
+  status: 'active' | 'completed' | 'estimated';
+  daysInCycle: number;
+  estimatedEndReading?: number;
+  estimatedCost?: number;
+  notes?: string;
+}
+
+export interface Alert {
+  id: string;
+  meterId?: string;
+  type: 'limit_exceeded' | 'unusual_usage' | 'maintenance_due' | 'billing_cycle' | 'cost_alert' | 'efficiency_tip';
+  title: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  timestamp: string;
+  isRead: boolean;
+  actionRequired?: boolean;
+  data?: any;
+}
+
+export interface UsageComparison {
+  currentPeriod: number;
+  previousPeriod: number;
+  percentageChange: number;
+  costDifference: number;
+  trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+export interface EnergyEfficiencyTip {
+  id: string;
+  category: 'heating' | 'cooling' | 'lighting' | 'appliances' | 'general';
+  title: string;
+  description: string;
+  potentialSavings: number; // Percentage
+  difficulty: 'easy' | 'medium' | 'hard';
+  estimatedCost: number;
+  paybackPeriod: number; // months
 }
 
 export interface NotificationSettings {
@@ -40,6 +110,10 @@ export interface NotificationSettings {
   monthlyReport: boolean;
   unusualUsage: boolean;
   maintenanceReminders: boolean;
+  billingCycleAlerts: boolean;
+  costAlerts: boolean;
+  efficiencyTips: boolean;
+  weatherAlerts: boolean;
 }
 
 export interface AppSettings {

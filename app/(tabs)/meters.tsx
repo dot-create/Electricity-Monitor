@@ -47,6 +47,11 @@ export default function MetersScreen() {
     tariffRate: '',
     currency: 'USD',
     isActive: true,
+    billingStartDay: '1',
+    voltage: '',
+    amperage: '',
+    phases: 1,
+    connectionType: 'overhead',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +71,11 @@ export default function MetersScreen() {
           tariffRate: meterToEdit.tariff?.rate.toString() || '',
           currency: meterToEdit.tariff?.currency || 'USD',
           isActive: meterToEdit.isActive,
+          billingStartDay: meterToEdit.billingCycle?.startDay.toString() || '1',
+          voltage: meterToEdit.connectionDetails?.voltage.toString() || '',
+          amperage: meterToEdit.connectionDetails?.amperage.toString() || '',
+          phases: meterToEdit.connectionDetails?.phases || 1,
+          connectionType: meterToEdit.connectionDetails?.connectionType || 'overhead',
         });
         setShowForm(true);
       }
@@ -131,6 +141,9 @@ export default function MetersScreen() {
       const dailyLimit = formData.dailyLimit ? parseFloat(formData.dailyLimit) : 0;
       const monthlyLimit = formData.monthlyLimit ? parseFloat(formData.monthlyLimit) : 0;
       const tariffRate = formData.tariffRate ? parseFloat(formData.tariffRate) : 0;
+      const billingStartDay = parseInt(formData.billingStartDay) || 1;
+      const voltage = formData.voltage ? parseFloat(formData.voltage) : 0;
+      const amperage = formData.amperage ? parseFloat(formData.amperage) : 0;
 
       if (editingMeter) {
         await updateMeter(editingMeter.id, {
@@ -141,6 +154,18 @@ export default function MetersScreen() {
           category: formData.category,
           tariff: tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined,
           isActive: formData.isActive,
+          billingCycle: {
+            startDay: billingStartDay,
+            endDay: billingStartDay === 1 ? 31 : billingStartDay - 1,
+            currentCycleStart: new Date().toISOString().split('T')[0],
+            currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+          },
+          connectionDetails: voltage > 0 || amperage > 0 ? {
+            voltage,
+            amperage,
+            phases: formData.phases,
+            connectionType: formData.connectionType,
+          } : undefined,
         });
       } else {
         await addMeter(
@@ -150,7 +175,19 @@ export default function MetersScreen() {
           dailyLimit,
           monthlyLimit,
           formData.category,
-          tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined
+          tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined,
+          {
+            startDay: billingStartDay,
+            endDay: billingStartDay === 1 ? 31 : billingStartDay - 1,
+            currentCycleStart: new Date().toISOString().split('T')[0],
+            currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+          },
+          voltage > 0 || amperage > 0 ? {
+            voltage,
+            amperage,
+            phases: formData.phases,
+            connectionType: formData.connectionType,
+          } : undefined
         );
       }
 
@@ -189,6 +226,11 @@ export default function MetersScreen() {
       tariffRate: '',
       currency: 'USD',
       isActive: true,
+      billingStartDay: '1',
+      voltage: '',
+      amperage: '',
+      phases: 1,
+      connectionType: 'overhead',
     });
     setFormErrors({});
     setEditingMeter(null);
@@ -233,6 +275,7 @@ export default function MetersScreen() {
                 <Text style={styles.categoryText}>
                   {meter.category?.charAt(0).toUpperCase() + meter.category?.slice(1)} • 
                   {meter.tariff ? ` $${meter.tariff.rate}/kWh` : ' No tariff set'}
+                  {meter.billingCycle && ` • Billing: ${meter.billingCycle.startDay}th`}
                 </Text>
                 <View style={[styles.statusBadge, { backgroundColor: meter.isActive ? colors.success : colors.error }]}>
                   <Text style={styles.statusText}>
@@ -256,6 +299,11 @@ export default function MetersScreen() {
                     tariffRate: meter.tariff?.rate.toString() || '',
                     currency: meter.tariff?.currency || 'USD',
                     isActive: meter.isActive,
+                    billingStartDay: meter.billingCycle?.startDay.toString() || '1',
+                    voltage: meter.connectionDetails?.voltage.toString() || '',
+                    amperage: meter.connectionDetails?.amperage.toString() || '',
+                    phases: meter.connectionDetails?.phases || 1,
+                    connectionType: meter.connectionDetails?.connectionType || 'overhead',
                   });
                   setShowForm(true);
                 }}
@@ -407,6 +455,21 @@ export default function MetersScreen() {
               </View>
             </View>
 
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Billing Cycle Start Day</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.billingStartDay}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, billingStartDay: text }))}
+                placeholder="1-31"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+              <Text style={styles.helpText}>
+                Day of the month when your billing cycle starts
+              </Text>
+            </View>
+
             <View style={styles.tariffContainer}>
               <Text style={styles.label}>Electricity Tariff (Optional)</Text>
               <View style={styles.tariffRow}>
@@ -419,6 +482,60 @@ export default function MetersScreen() {
                   keyboardType="numeric"
                 />
                 <Text style={styles.tariffUnit}>per kWh</Text>
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Connection Details (Optional)</Text>
+              <View style={styles.connectionRow}>
+                <TextInput
+                  style={[styles.input, styles.connectionInput]}
+                  value={formData.voltage}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, voltage: text }))}
+                  placeholder="240"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.connectionUnit}>V</Text>
+                <TextInput
+                  style={[styles.input, styles.connectionInput]}
+                  value={formData.amperage}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, amperage: text }))}
+                  placeholder="100"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.connectionUnit}>A</Text>
+              </View>
+              <View style={styles.phaseSelector}>
+                <TouchableOpacity
+                  style={[
+                    styles.phaseButton,
+                    formData.phases === 1 && styles.phaseButtonActive
+                  ]}
+                  onPress={() => setFormData(prev => ({ ...prev, phases: 1 }))}
+                >
+                  <Text style={[
+                    styles.phaseButtonText,
+                    formData.phases === 1 && styles.phaseButtonTextActive
+                  ]}>
+                    Single Phase
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.phaseButton,
+                    formData.phases === 3 && styles.phaseButtonActive
+                  ]}
+                  onPress={() => setFormData(prev => ({ ...prev, phases: 3 }))}
+                >
+                  <Text style={[
+                    styles.phaseButtonText,
+                    formData.phases === 3 && styles.phaseButtonTextActive
+                  ]}>
+                    Three Phase
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -661,6 +778,48 @@ const createStyles = (colors: any) => StyleSheet.create({
   tariffUnit: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  connectionInput: {
+    flex: 1,
+  },
+  connectionUnit: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  phaseSelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  phaseButton: {
+    flex: 1,
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  phaseButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  phaseButtonText: {
+    fontSize: 12,
+    color: colors.text,
+  },
+  phaseButtonTextActive: {
+    color: colors.background,
+  },
+  helpText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   switchRow: {
     flexDirection: 'row',

@@ -33,7 +33,9 @@ export const useMeters = () => {
     dailyLimit: number = 0,
     monthlyLimit: number = 0,
     category: 'residential' | 'commercial' | 'industrial' = 'residential',
-    tariff?: { rate: number; currency: string }
+    tariff?: { rate: number; currency: string },
+    billingCycle?: { startDay: number; endDay: number; currentCycleStart: string; currentCycleEnd: string },
+    connectionDetails?: { voltage: number; amperage: number; phases: 1 | 3; connectionType: 'overhead' | 'underground' }
   ): Promise<void> => {
     try {
       FormValidator.validateMeterName(name);
@@ -52,6 +54,13 @@ export const useMeters = () => {
         },
         category,
         tariff,
+        billingCycle: billingCycle || {
+          startDay: 1,
+          endDay: 31,
+          currentCycleStart: new Date().toISOString().split('T')[0],
+          currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+        },
+        connectionDetails,
         isActive: true,
       };
 

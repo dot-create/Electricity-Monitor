@@ -79,29 +79,6 @@ export class ImageProcessor {
     }
   }
 
-  private static extractDigits = (text: string): string => {
-    // Basic digit-only match (you can customize with regex if needed)
-    const match = text.match(/\d+(\.\d+)?/g);
-    return match ? match.join(' ') : 'No digits found';
-  };
-
-  private static formatMeterReading = (raw: string): string => {
-    // Remove any non-digit characters
-    const digitsOnly = raw.replace(/\D/g, '');
-
-    if (digitsOnly.length < 3) {
-      // If less than 3 digits, return as-is (or format accordingly)
-      return digitsOnly;
-    }
-
-    // Split into whole and decimal parts
-    const wholePart = digitsOnly.slice(0, -2);
-    const decimalPart = digitsOnly.slice(-2);
-
-    return `${wholePart}.${decimalPart}`;
-  };
-
-
   private static async performOCR(imageUri: string): Promise<any> {
     try {
       if (Platform.OS === 'web') {
@@ -112,16 +89,6 @@ export class ImageProcessor {
       
       // Use ML Kit Text Recognition for native platforms
       const result = await TextRecognition.recognize(imageUri);
-
-
-      const textBlocks = result?.blocks || [];
-      const allText = textBlocks.map(block => block.text).join(' ');
-
-      console.log('Detected text:', allText);
-      const meterReading = this.extractDigits(allText);
-      const formattedReading = this.formatMeterReading(meterReading);
-      console.log('Meter Reading:', formattedReading);
-
       return result;
     } catch (error) {
       console.error('OCR failed:', error);

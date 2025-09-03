@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, Zap, ChartBar as BarChart3, BookOpen, Settings, Target } from 'lucide-react-native';
+import { Chrome as Home, Zap, ChartBar as BarChart3, BookOpen, Settings, Target, Receipt } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function TabLayout() {
@@ -68,6 +68,15 @@ export default function TabLayout() {
           title: 'Goals',
           tabBarIcon: ({ size, color }) => (
             <Target size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="billing"
+        options={{
+          title: 'Billing',
+          tabBarIcon: ({ size, color }) => (
+            <Receipt size={size} color={color} />
           ),
         }}
       />

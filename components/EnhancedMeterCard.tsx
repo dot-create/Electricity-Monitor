@@ -87,7 +87,7 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
           <Text style={styles.name}>{meter.name}</Text>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>
-              {meter.category?.charAt(0).toUpperCase() + meter.category?.slice(1)}
+              {meter.category.charAt(0).toUpperCase() + meter.category.slice(1)}
             </Text>
           </View>
         </View>
@@ -169,6 +169,12 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
               Limit: {meter.limits.daily} kWh
             </Text>
           )}
+          {yesterdayConsumption > 0 && todayConsumption > 0 && (
+            <Text style={styles.comparisonText}>
+              {todayConsumption > yesterdayConsumption ? '↑' : '↓'} 
+              {Math.abs(((todayConsumption - yesterdayConsumption) / yesterdayConsumption) * 100).toFixed(0)}% vs yesterday
+            </Text>
+          )}
         </View>
         
         <View style={styles.statItem}>
@@ -189,6 +195,9 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
               Limit: {meter.limits.monthly} kWh
             </Text>
           )}
+          <Text style={styles.comparisonText}>
+            Avg: {stats.dailyAverage.toFixed(1)} kWh/day
+          </Text>
         </View>
       </View>
 
@@ -549,5 +558,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 10,
     color: colors.background,
     fontWeight: '700',
+  },
+  comparisonText: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 });
