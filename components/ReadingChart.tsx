@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, StyleSheet, Dimensions, Text, ScrollView } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '@/hooks/useTheme';
 import { UsageCalculator } from '@/utils/calculations';
@@ -17,6 +17,8 @@ export const ReadingChart: React.FC<ReadingChartProps> = ({
   days = 7,
 }) => {
   const { colors } = useTheme();
+
+  // Default screen width (with 32 padding for margins)
   const screenWidth = Dimensions.get('window').width - 32;
   
   const chartData = UsageCalculator.getChartData(readings, meterId, days);
@@ -30,6 +32,9 @@ export const ReadingChart: React.FC<ReadingChartProps> = ({
       </View>
     );
   }
+
+  // Wider width for 30-day scrollable chart
+  const chartWidth = days === 30 ? screenWidth * 3 : screenWidth - 20;
 
   const chartConfig = {
     backgroundColor: colors.surface,
@@ -53,26 +58,56 @@ export const ReadingChart: React.FC<ReadingChartProps> = ({
       <Text style={[styles.title, { color: colors.text }]}>
         Usage Trend ({days} days)
       </Text>
-      <LineChart
-        data={{
-          labels: chartData.labels,
-          datasets: [{
-            data: chartData.data,
-            color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-            strokeWidth: 2,
-          }],
-        }}
-        width={screenWidth}
-        height={220}
-        chartConfig={chartConfig}
-        bezier
-        style={styles.chart}
-        yAxisSuffix=" kWh"
-        withHorizontalLabels={true}
-        withVerticalLabels={true}
-        withDots={true}
-        withShadow={false}
-      />
+
+      {days === 30 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <LineChart
+            data={{
+              labels: chartData.labels,
+              datasets: [
+                {
+                  data: chartData.data,
+                  color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+                  strokeWidth: 2,
+                },
+              ],
+            }}
+            width={chartWidth}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+            yAxisSuffix=" kWh"
+            withHorizontalLabels
+            withVerticalLabels
+            withDots
+            withShadow={false}
+          />
+        </ScrollView>
+      ) : (
+        <LineChart
+          data={{
+            labels: chartData.labels,
+            datasets: [
+              {
+                data: chartData.data,
+                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+                strokeWidth: 2,
+              },
+            ],
+          }}
+          width={chartWidth}
+          height={220}
+          chartConfig={chartConfig}
+          bezier
+          style={styles.chart}
+          yAxisSuffix=" kWh"
+          withHorizontalLabels
+          withVerticalLabels
+          withDots
+          withShadow={false}
+        />
+      )}
     </View>
   );
 };

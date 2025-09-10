@@ -87,7 +87,7 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
           <Text style={styles.name}>{meter.name}</Text>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>
-              {meter.category.charAt(0).toUpperCase() + meter.category.slice(1)}
+              {meter.category?.charAt(0).toUpperCase() + meter.category?.slice(1)}
             </Text>
           </View>
         </View>
