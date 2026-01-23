@@ -61,6 +61,10 @@ export const MeterCard: React.FC<MeterCardProps> = ({
         <Text style={styles.meterId}>ID: {meter.meterId}</Text>
       )}
 
+      {meter.startingReading !== undefined && (
+        <Text style={styles.meterId}>Starting Reading: {meter.startingReading} kWh</Text>
+      )}
+
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Today</Text>
