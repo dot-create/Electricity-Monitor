@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Calendar, DollarSign, TrendingUp, Clock, Zap } from 'lucide-react-native';
+import { Calendar, DollarSign, TrendingUp, Clock, Zap, Edit3, Trash2 } from 'lucide-react-native';
 import { BillingCycle, Meter } from '@/types';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -8,6 +8,8 @@ interface BillingCycleCardProps {
   cycle: BillingCycle;
   meter: Meter;
   onPress: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
   daysRemaining?: number;
   estimatedBill?: { estimated: number; confidence: number };
 }
@@ -18,6 +20,8 @@ export const BillingCycleCard: React.FC<BillingCycleCardProps> = ({
   onPress,
   daysRemaining,
   estimatedBill,
+  onEdit,
+  onDelete,
 }) => {
   const { colors } = useTheme();
   
@@ -48,6 +52,18 @@ export const BillingCycleCard: React.FC<BillingCycleCardProps> = ({
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
             <Text style={styles.statusText}>{cycle.status.toUpperCase()}</Text>
           </View>
+        </View>
+        <View style={styles.actions}>
+          {onEdit && (
+            <TouchableOpacity onPress={onEdit} style={styles.actionButton}>
+              <Edit3 size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+          {onDelete && (
+            <TouchableOpacity onPress={onDelete} style={styles.actionButton}>
+              <Trash2 size={16} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -133,8 +149,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   header: {
     marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   titleRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -143,7 +163,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.text,
-    flex: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -154,6 +173,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 10,
     color: colors.background,
     fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 4,
   },
   dateRange: {
     flexDirection: 'row',

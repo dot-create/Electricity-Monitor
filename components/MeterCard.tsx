@@ -20,7 +20,7 @@ export const MeterCard: React.FC<MeterCardProps> = ({
 }) => {
   const { colors } = useTheme();
   const meterReadings = readings.filter(r => r.meterId === meter.id);
-  const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+  const stats = UsageCalculator.getUsageStats(meterReadings, meter.id, meter.billingCycle);
   
   const latestReading = UsageCalculator.getLatestReading(meterReadings, meter.id);
   const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);

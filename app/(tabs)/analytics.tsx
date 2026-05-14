@@ -34,33 +34,47 @@ export default function AnalyticsScreen() {
 
   const selectedMeter = meters.find(m => m.id === selectedMeterId);
   
-  const getStatsForMeter = (meterId: string) => {
-    const meterReadings = readings.filter(r => r.meterId === meterId);
-    return UsageCalculator.getUsageStats(meterReadings, meterId);
+  const getStatsForMeter = (meter: Meter) => {
+    const meterReadings = readings.filter(r => r.meterId === meter.id);
+    return UsageCalculator.getUsageStats(meterReadings, meter.id, meter.billingCycle);
   };
 
-  const stats = selectedMeterId === 'all'
-    ? {
-        currentWeekTotal: meters.reduce((sum, meter) => {
-          const meterReadings = readings.filter(r => r.meterId === meter.id);
-          return sum + UsageCalculator.getWeeklyTotal(meterReadings, meter.id);
-        }, 0),
-        currentMonthTotal: meters.reduce((sum, meter) => {
-          const meterReadings = readings.filter(r => r.meterId === meter.id);
-          return sum + UsageCalculator.getMonthlyTotal(meterReadings, meter.id);
-        }, 0),
-        dailyAverage: meters.reduce((sum, meter) => {
-          const meterReadings = readings.filter(r => r.meterId === meter.id);
-          return sum + UsageCalculator.getDailyAverage(meterReadings, meter.id);
-        }, 0),
-        monthlyChange: meters.length > 0 
-          ? meters.reduce((sum, meter) => {
-              const meterReadings = readings.filter(r => r.meterId === meter.id);
-              return sum + UsageCalculator.getMonthlyChange(meterReadings, meter.id);
-            }, 0) / meters.length
-          : 0,
-      }
-    : getStatsForMeter(selectedMeterId);
+  const stats = (() => {
+    if (selectedMeterId === 'all') {
+      let totalWeek = 0;
+      let totalMonth = 0;
+      let totalDailyAverage = 0;
+      let totalMonthlyChange = 0;
+      let metersWithChange = 0;
+
+      meters.forEach(meter => {
+        const meterStats = getStatsForMeter(meter);
+        totalWeek += meterStats.currentWeekTotal;
+        totalMonth += meterStats.currentMonthTotal;
+        totalDailyAverage += meterStats.dailyAverage;
+        if (meterStats.monthlyChange !== 0) {
+          totalMonthlyChange += meterStats.monthlyChange;
+          metersWithChange++;
+        }
+      });
+
+      return {
+        currentWeekTotal: totalWeek,
+        currentMonthTotal: totalMonth,
+        dailyAverage: totalDailyAverage,
+        monthlyChange: metersWithChange > 0 ? totalMonthlyChange / metersWithChange : 0,
+      };
+    } else if (selectedMeter) {
+      return getStatsForMeter(selectedMeter);
+    }
+    // Default empty stats
+    return {
+      currentWeekTotal: 0,
+      currentMonthTotal: 0,
+      dailyAverage: 0,
+      monthlyChange: 0,
+    };
+  })();
 
   const getTopConsumer = () => {
     if (meters.length === 0) return null;

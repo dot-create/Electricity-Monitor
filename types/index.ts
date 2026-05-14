@@ -255,3 +255,20 @@ export interface MeterTemplate {
     textColor: 'light' | 'dark';
   };
 }
+
+interface FormData {
+  name: string;
+  location: string;
+  meterId: string;
+  dailyLimit: string;
+  monthlyLimit: string;
+  category: 'residential' | 'commercial' | 'industrial';
+  tariffRate: string;
+  currency: string;
+  isActive: boolean;
+  billingStartDay: string;
+  voltage: string;
+  amperage: string;
+  phases: 1 | 3;
+  connectionType: 'overhead' | 'underground';
+}

@@ -4,6 +4,7 @@ import { Zap, MapPin, Calendar, TrendingUp, TrendingDown, Camera, CreditCard as 
 import { Meter, Reading } from '@/types';
 import { useTheme } from '@/hooks/useTheme';
 import { UsageCalculator } from '@/utils/calculations';
+import { BillingCycleManager } from '@/utils/billingCycle';
 
 interface EnhancedMeterCardProps {
   meter: Meter;
@@ -22,7 +23,7 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
 }) => {
   const { colors } = useTheme();
   const meterReadings = readings.filter(r => r.meterId === meter.id);
-  const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+  const stats = UsageCalculator.getUsageStats(meterReadings, meter.id, meter.billingCycle);
   
   const latestReading = UsageCalculator.getLatestReading(meterReadings, meter.id);
   const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
@@ -32,6 +33,11 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
   const readingsCount = UsageCalculator.getMeterReadingsCount(meterReadings, meter.id);
   const todayCost = meter.tariff ? todayConsumption * meter.tariff.rate : 0;
   const monthlyCost = meter.tariff ? stats.currentMonthTotal * meter.tariff.rate : 0;
+
+  // Calculate billing cycle info
+  const daysUntilBilling = meter.billingCycle 
+    ? BillingCycleManager.getDaysUntilBilling(meter.billingCycle.startDay)
+    : null;
 
   const isOverDailyLimit = meter.limits.daily > 0 && todayConsumption > meter.limits.daily;
   const isOverMonthlyLimit = meter.limits.monthly > 0 && stats.currentMonthTotal > meter.limits.monthly;
@@ -167,6 +173,11 @@ export const EnhancedMeterCard: React.FC<EnhancedMeterCardProps> = ({
           {meter.limits.daily > 0 && (
             <Text style={styles.limitText}>
               Limit: {meter.limits.daily} kWh
+            </Text>
+          )}
+          {daysUntilBilling !== null && (
+            <Text style={styles.billingText}>
+              Billing: {daysUntilBilling} days
             </Text>
           )}
           {yesterdayConsumption > 0 && todayConsumption > 0 && (
@@ -560,6 +571,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
   },
   comparisonText: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  billingText: {
     fontSize: 9,
     color: colors.textSecondary,
     marginTop: 2,

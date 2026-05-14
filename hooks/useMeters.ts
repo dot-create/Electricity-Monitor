@@ -27,53 +27,53 @@ export const useMeters = () => {
   }, [loadMeters]);
 
   const addMeter = async (
-    name: string,
-    location: string,
-    meterId?: string,
-    dailyLimit: number = 0,
-    monthlyLimit: number = 0,
-    category: 'residential' | 'commercial' | 'industrial' = 'residential',
-    tariff?: { rate: number; currency: string },
-    billingCycle?: { startDay: number; endDay: number; currentCycleStart: string; currentCycleEnd: string },
-    connectionDetails?: { voltage: number; amperage: number; phases: 1 | 3; connectionType: 'overhead' | 'underground' }
-  ): Promise<void> => {
-    try {
-      FormValidator.validateMeterName(name);
-      FormValidator.validateLocation(location);
-      FormValidator.validateMeterId(meterId);
+  name: string,
+  location: string,
+  meterId?: string,
+  dailyLimit: number = 0,
+  monthlyLimit: number = 0,
+  category: 'residential' | 'commercial' | 'industrial' = 'residential',
+  tariff?: { rate: number; currency: string },
+  billingCycle?: { startDay: number; endDay: number; currentCycleStart: string; currentCycleEnd: string },
+  connectionDetails?: { voltage: number; amperage: number; phases: 1 | 3; connectionType: 'overhead' | 'underground' }
+): Promise<void> => {
+  try {
+    FormValidator.validateMeterName(name);
+    FormValidator.validateLocation(location);
+    FormValidator.validateMeterId(meterId);
 
-      const newMeter: Meter = {
-        id: Date.now().toString(),
-        name: name.trim(),
-        location: location.trim(),
-        meterId: meterId?.trim(),
-        createdDate: new Date().toISOString(),
-        limits: {
-          daily: dailyLimit,
-          monthly: monthlyLimit,
-        },
-        category,
-        tariff,
-        billingCycle: billingCycle || {
-          startDay: 1,
-          endDay: 31,
-          currentCycleStart: new Date().toISOString().split('T')[0],
-          currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
-        },
-        connectionDetails,
-        isActive: true,
-      };
+    const newMeter: Meter = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      location: location.trim(),
+      meterId: meterId?.trim(),
+      createdDate: new Date().toISOString(),
+      limits: {
+        daily: dailyLimit,
+        monthly: monthlyLimit,
+      },
+      category,
+      tariff,
+      billingCycle: billingCycle || {
+        startDay: 1,
+        endDay: 31,
+        currentCycleStart: new Date().toISOString().split('T')[0],
+        currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      },
+      connectionDetails,
+      isActive: true,
+    };
 
-      const updatedMeters = [...meters, newMeter];
-      await StorageManager.saveMeters(updatedMeters);
-      setMeters(updatedMeters);
-    } catch (err) {
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error('Failed to add meter');
+    const updatedMeters = [...meters, newMeter];
+    await StorageManager.saveMeters(updatedMeters);
+    setMeters(updatedMeters);
+  } catch (err) {
+    if (err instanceof Error) {
+      throw err;
     }
-  };
+    throw new Error('Failed to add meter');
+  }
+};
 
   const updateMeter = async (
     id: string,

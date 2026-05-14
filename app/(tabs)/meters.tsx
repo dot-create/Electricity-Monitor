@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { Meter } from '@/types';
 import { FormValidator, ValidationError } from '@/utils/validation';
+import { UsageCalculator } from '@/utils/calculations';
 import { router, useLocalSearchParams } from 'expo-router';
 
 interface FormData {
@@ -28,6 +29,11 @@ interface FormData {
   tariffRate: string;
   currency: string;
   isActive: boolean;
+  billingStartDay: string;
+  voltage: string;
+  amperage: string;
+  phases: number;
+  connectionType: string;
 }
 
 export default function MetersScreen() {
@@ -145,6 +151,8 @@ export default function MetersScreen() {
       const voltage = formData.voltage ? parseFloat(formData.voltage) : 0;
       const amperage = formData.amperage ? parseFloat(formData.amperage) : 0;
 
+      const { startDate: cycleStartDate, endDate: cycleEndDate } = UsageCalculator.getCurrentBillingCycleDateRange(billingStartDay);
+
       if (editingMeter) {
         await updateMeter(editingMeter.id, {
           name: formData.name,
@@ -156,9 +164,9 @@ export default function MetersScreen() {
           isActive: formData.isActive,
           billingCycle: {
             startDay: billingStartDay,
-            endDay: billingStartDay === 1 ? 31 : billingStartDay - 1,
-            currentCycleStart: new Date().toISOString().split('T')[0],
-            currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+            endDay: cycleEndDate.getDate(),
+            currentCycleStart: cycleStartDate.toISOString().split('T')[0],
+            currentCycleEnd: cycleEndDate.toISOString().split('T')[0],
           },
           connectionDetails: voltage > 0 || amperage > 0 ? {
             voltage,
@@ -178,15 +186,15 @@ export default function MetersScreen() {
           tariffRate > 0 ? { rate: tariffRate, currency: formData.currency } : undefined,
           {
             startDay: billingStartDay,
-            endDay: billingStartDay === 1 ? 31 : billingStartDay - 1,
-            currentCycleStart: new Date().toISOString().split('T')[0],
-            currentCycleEnd: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+            endDay: cycleEndDate.getDate(),
+            currentCycleStart: cycleStartDate.toISOString().split('T')[0],
+            currentCycleEnd: cycleEndDate.toISOString().split('T')[0],
           },
           voltage > 0 || amperage > 0 ? {
-            voltage,
-            amperage,
-            phases: formData.phases,
-            connectionType: formData.connectionType,
+            voltage: voltage,
+            amperage: amperage,
+            phases: formData.phases as 1 | 3, // Explicitly cast to 1 | 3
+            connectionType: formData.connectionType as 'overhead' | 'underground', // Explicitly cast to 'overhead' | 'underground'
           } : undefined
         );
       }
@@ -740,7 +748,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  formActions: {
   categorySelector: {
     flexDirection: 'row',
     gap: 8,
@@ -826,6 +833,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  formActions: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 24,

@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMeters } from '@/hooks/useMeters';
 import { useReadings } from '@/hooks/useReadings';
 import { useGoals } from '@/hooks/useGoals';
+import { useBillingCycle } from '@/hooks/useBillingCycle';
 import { MeterCard } from '@/components/MeterCard';
 import { EnhancedMeterCard } from '@/components/EnhancedMeterCard';
 import { CameraReadingModal } from '@/components/CameraReadingModal';
@@ -29,6 +30,7 @@ export default function DashboardScreen() {
   const { meters, loading: metersLoading, refreshMeters } = useMeters();
   const { readings, loading: readingsLoading, refreshReadings } = useReadings();
   const { goals } = useGoals();
+  const { billingCycles, getCurrentCycle } = useBillingCycle();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastNotificationCheck, setLastNotificationCheck] = useState<Date | null>(null);
@@ -57,11 +59,24 @@ export default function DashboardScreen() {
     // Check each meter individually
     for (const meter of meters) {
       const meterReadings = readings.filter(r => r.meterId === meter.id);
-      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id, meter.billingCycle);
       const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
       const yesterdayConsumption = UsageCalculator.getYesterdayConsumption(meterReadings, meter.id);
       const trend = UsageCalculator.getConsumptionTrend(meterReadings, meter.id);
       const peakDay = UsageCalculator.getPeakUsageDay(meterReadings, meter.id);
+      
+      // Check billing cycle status
+      if (meter.billingCycle) {
+        const currentCycle = getCurrentCycle(meter.id, meter.billingCycle.startDay);
+        if (!currentCycle && meter.isActive) {
+          alerts.push({
+            id: `no-cycle-${meter.id}`,
+            title: 'No Active Billing Cycle',
+            message: `${meter.name}: Create a billing cycle to track monthly costs`,
+            type: 'info',
+          });
+        }
+      }
 
       // Daily limit alerts
       if (settings.notifications.dailyLimit && meter.limits.daily > 0 && todayConsumption > meter.limits.daily) {
@@ -191,7 +206,7 @@ export default function DashboardScreen() {
 
     activeMeters.forEach(meter => {
       const meterReadings = readings.filter(r => r.meterId === meter.id);
-      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id);
+      const stats = UsageCalculator.getUsageStats(meterReadings, meter.id, meter.billingCycle);
       const todayConsumption = UsageCalculator.getTodayConsumption(meterReadings, meter.id);
       
       totalMonthly += stats.currentMonthTotal;
